@@ -10,8 +10,30 @@ namespace WoxTimerPlugin
     public class Main : IPlugin
     {
         private PluginInitContext _context;
-        private Dictionary<string, Timer> _activeTimers = new Dictionary<string, Timer>();
+        private Dictionary<string, TimerInfo> _activeTimers = new Dictionary<string, TimerInfo>();
         private static readonly Regex TimeRegex = new Regex(@"^(?:(?<hours>\d+):)?(?<minutes>\d+):(?<seconds>\d+)$", RegexOptions.Compiled);
+
+        // 計時器資訊類別，用於記錄計時器相關資訊
+        private class TimerInfo
+        {
+            public Timer Timer { get; set; }
+            public string Title { get; set; }
+            public DateTime EndTime { get; set; }
+            public int TotalSeconds { get; set; }
+            
+            public string GetRemainingTime()
+            {
+                TimeSpan remaining = EndTime - DateTime.Now;
+                if (remaining.TotalSeconds <= 0)
+                    return "即將完成";
+                
+                int hours = remaining.Hours;
+                int minutes = remaining.Minutes;
+                int seconds = remaining.Seconds;
+                
+                return FormatTimeDisplay(hours, minutes, seconds);
+            }
+        }
 
         public void Init(PluginInitContext context)
         {
@@ -21,8 +43,7 @@ namespace WoxTimerPlugin
         public List<Result> Query(Query query)
         {
             var results = new List<Result>();
-            
-            if (string.IsNullOrEmpty(query.Search))
+              if (string.IsNullOrEmpty(query.Search))
             {
                 // 顯示基本使用方法
                 results.Add(new Result
@@ -32,13 +53,25 @@ namespace WoxTimerPlugin
                     IcoPath = "Images\\timer.png"
                 });
                 
-                // 顯示取消選項（如果有活動的計時器）
+                // 查看所有計時器選項
                 if (_activeTimers.Count > 0)
                 {
                     results.Add(new Result
                     {
-                        Title = "取消所有計時器",
+                        Title = "查看所有計時器",
                         SubTitle = $"目前有 {_activeTimers.Count} 個活動計時器",
+                        IcoPath = "Images\\timer.png",
+                        Action = c =>
+                        {
+                            _context.API.ChangeQuery("timer 列表");
+                            return false;
+                        }
+                    });
+                    
+                    results.Add(new Result
+                    {
+                        Title = "取消所有計時器",
+                        SubTitle = $"一次取消所有 {_activeTimers.Count} 個活動計時器",
                         IcoPath = "Images\\timer.png",
                         Action = c =>
                         {
@@ -49,8 +82,42 @@ namespace WoxTimerPlugin
                 }
                 
                 return results;
+            }            // 檢查是否為列表命令
+            if (query.Search.Trim().ToLower() == "列表" || query.Search.Trim().ToLower() == "list")
+            {
+                if (_activeTimers.Count > 0)
+                {
+                    foreach (var pair in _activeTimers)
+                    {
+                        var timerId = pair.Key;
+                        var timerInfo = pair.Value;
+                        
+                        results.Add(new Result
+                        {
+                            Title = $"{timerInfo.Title} - 剩餘 {timerInfo.GetRemainingTime()}",
+                            SubTitle = $"按 Enter 取消此計時器",
+                            IcoPath = "Images\\timer.png",
+                            Action = c =>
+                            {
+                                CancelTimer(timerId);
+                                return true;
+                            }
+                        });
+                    }
+                }
+                else
+                {
+                    results.Add(new Result
+                    {
+                        Title = "目前沒有活動的計時器",
+                        SubTitle = "輸入 timer HH:mm:ss [標題] 設定計時器",
+                        IcoPath = "Images\\timer.png"
+                    });
+                }
+                
+                return results;
             }
-
+            
             // 檢查是否為取消命令
             if (query.Search.Trim().ToLower() == "cancel" || query.Search.Trim().ToLower() == "取消")
             {
@@ -65,6 +132,19 @@ namespace WoxTimerPlugin
                         {
                             CancelAllTimers();
                             return true;
+                        }
+                    });
+                    
+                    // 提供查看列表的選項
+                    results.Add(new Result
+                    {
+                        Title = "查看計時器列表",
+                        SubTitle = "選擇要取消的特定計時器",
+                        IcoPath = "Images\\timer.png",
+                        Action = c =>
+                        {
+                            _context.API.ChangeQuery("timer 列表");
+                            return false;
                         }
                     });
                 }
@@ -146,7 +226,7 @@ namespace WoxTimerPlugin
             return results;
         }
 
-        private string FormatTimeDisplay(int hours, int minutes, int seconds)
+        private static string FormatTimeDisplay(int hours, int minutes, int seconds)
         {
             if (hours > 0)
             {
@@ -173,7 +253,10 @@ namespace WoxTimerPlugin
             // 顯示通知：計時器已啟動
             ShowNotification($"計時器已啟動", $"{FormatTimeDisplay(seconds/3600, (seconds/60)%60, seconds%60)} - {title}");
             
-            // 建立並啟動 Timer
+            // 計算結束時間
+            DateTime endTime = DateTime.Now.AddSeconds(seconds);
+            
+            // 建立 Timer 實例
             var timer = new Timer(state =>
             {
                 // 通知使用者時間到
@@ -183,21 +266,38 @@ namespace WoxTimerPlugin
                 _activeTimers.Remove(id);
             }, null, milliseconds, Timeout.Infinite);
             
-            // 將計時器加入活動計時器列表
-            _activeTimers[id] = timer;
+            // 將計時器資訊儲存到字典
+            _activeTimers[id] = new TimerInfo
+            {
+                Timer = timer,
+                Title = title,
+                EndTime = endTime,
+                TotalSeconds = seconds
+            };
         }
 
         private void CancelAllTimers()
         {
-            foreach (var timer in _activeTimers.Values)
+            foreach (var timerInfo in _activeTimers.Values)
             {
-                timer.Dispose();
+                timerInfo.Timer.Dispose();
             }
             
             int count = _activeTimers.Count;
             _activeTimers.Clear();
             
             ShowNotification("計時器已取消", $"已取消 {count} 個計時器");
+        }
+
+        private void CancelTimer(string timerId)
+        {
+            if (_activeTimers.TryGetValue(timerId, out var timerInfo))
+            {
+                timerInfo.Timer.Dispose();
+                _activeTimers.Remove(timerId);
+                
+                ShowNotification("計時器已取消", $"已取消計時器: {timerInfo.Title}");
+            }
         }
 
         private void ShowNotification(string title, string message)
