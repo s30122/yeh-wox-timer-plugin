@@ -16,7 +16,7 @@ namespace WoxTimerPlugin
         // 計時器資訊類別，用於記錄計時器相關資訊
         private class TimerInfo
         {
-            public Timer Timer { get; set; }
+            public System.Threading.Timer Timer { get; set; }
             public string Title { get; set; }
             public DateTime EndTime { get; set; }
             public int TotalSeconds { get; set; }
@@ -255,9 +255,8 @@ namespace WoxTimerPlugin
             
             // 計算結束時間
             DateTime endTime = DateTime.Now.AddSeconds(seconds);
-            
-            // 建立 Timer 實例
-            var timer = new Timer(state =>
+              // 建立 Timer 實例
+            var timer = new System.Threading.Timer(state =>
             {
                 // 通知使用者時間到
                 ShowNotification(title, $"倒數計時完成！");
@@ -312,9 +311,8 @@ namespace WoxTimerPlugin
             };
             
             notification.ShowBalloonTip(5000); // 顯示 5 秒
-            
-            // 設定自動清理通知
-            var disposeTimer = new Timer(obj =>
+              // 設定自動清理通知
+            var disposeTimer = new System.Threading.Timer(obj =>
             {
                 notification.Dispose();
             }, null, 6000, Timeout.Infinite);

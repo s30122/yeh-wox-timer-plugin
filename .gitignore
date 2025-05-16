@@ -1,0 +1,61 @@
+# Visual Studio / JetBrains Rider 專案檔案
+.vs/
+.idea/
+_ReSharper.*/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sln.iml
+
+# 建置結果
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Tt]est[Rr]esult*/
+
+# Visual Studio 快取/選項目錄
+.vs/
+# 取消註解如果你有 VSCode 專案設定
+#.vscode/
+
+# JetBrains Rider 特定檔案
+.idea/
+*.sln.iml
+*.DotSettings.user
+
+# NuGet 套件
+*.nupkg
+# NuGet Symbol 套件
+*.snupkg
+# NuGet 包裹目錄
+**/[Pp]ackages/*
+# 排除帶有 .nuget 的目錄
+!**/[Pp]ackages/build/
+# 排除 project.json 檔案 (舊版 NuGet)
+!**/[Pp]ackages/repositories.config
+# NuGet v3 project.json 檔案
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio 快取檔案
+*.[Cc]ache
+!?*.[Cc]ache/
+
+# 其他檔案
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.pfx
+*.publishsettings
+orleans.codegen.cs
+
+# Visual Studio 建置日誌
+*.binlog
+
+# 常見的 Windows 檔案
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
