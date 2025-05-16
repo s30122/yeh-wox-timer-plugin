@@ -1,0 +1,12 @@
+{
+  "ID": "WoxTimerPlugin",
+  "ActionKeyword": "timer",
+  "Name": "倒數計時器",
+  "Description": "提供倒數計時，並於桌面通知的功能",
+  "Author": "User",
+  "Version": "1.0.0",
+  "Language": "csharp",
+  "Website": "",
+  "ExecuteFileName": "WoxTimerPlugin.dll",
+  "IcoPath": "Images\\timer.png"
+}
