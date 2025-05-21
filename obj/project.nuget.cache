@@ -1,11 +1,14 @@
 {
   "version": 2,
-  "dgSpecHash": "7AYWMalSQJA=",
+  "dgSpecHash": "pPNRY32E9Zs=",
   "success": true,
   "projectFilePath": "C:\\Users\\ccyeh\\RiderProjects\\wox-extension\\wox-extension.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\ccyeh\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
     "C:\\Users\\ccyeh\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net452\\1.0.3\\microsoft.netframework.referenceassemblies.net452.1.0.3.nupkg.sha512",
+    "C:\\Users\\ccyeh\\.nuget\\packages\\serilog\\2.12.0\\serilog.2.12.0.nupkg.sha512",
+    "C:\\Users\\ccyeh\\.nuget\\packages\\serilog.sinks.console\\4.1.0\\serilog.sinks.console.4.1.0.nupkg.sha512",
+    "C:\\Users\\ccyeh\\.nuget\\packages\\serilog.sinks.file\\5.0.0\\serilog.sinks.file.5.0.0.nupkg.sha512",
     "C:\\Users\\ccyeh\\.nuget\\packages\\wox.plugin\\1.3.159\\wox.plugin.1.3.159.nupkg.sha512"
   ],
   "logs": []

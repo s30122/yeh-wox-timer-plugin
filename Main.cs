@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using System.Text.RegularExpressions;
 using Wox.Plugin;
+using Serilog;
+using Serilog.Events;
 
 namespace WoxTimerPlugin
 {
@@ -15,6 +18,9 @@ namespace WoxTimerPlugin
         // 新增鬧鐘格式的正則表達式 (HH:mm)
         private static readonly Regex AlarmTimeRegex = new Regex(@"^(?<hours>\d{1,2}):(?<minutes>\d{2})$", RegexOptions.Compiled);
 
+        // Serilog logger 實例
+        private static ILogger _logger;
+
         // 計時器資訊類別，用於記錄計時器相關資訊
         private class TimerInfo
         {
@@ -23,28 +29,49 @@ namespace WoxTimerPlugin
             public DateTime EndTime { get; set; }
             public int TotalSeconds { get; set; }
             public bool IsAlarm { get; set; }
-            
+
             public string GetRemainingTime()
             {
                 TimeSpan remaining = EndTime - DateTime.Now;
                 if (remaining.TotalSeconds <= 0)
                     return "即將完成";
-                
+
                 int hours = remaining.Hours;
                 int minutes = remaining.Minutes;
                 int seconds = remaining.Seconds;
-                
+
                 return FormatTimeDisplay(hours, minutes, seconds);
             }
         }
-
         public void Init(PluginInitContext context)
         {
             _context = context;
+
+            // 建立日誌目錄
+            string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WoxTimerPlugin", "Logs");
+            if (!Directory.Exists(logDir))
+            {
+                Directory.CreateDirectory(logDir);
+            }
+
+            // 設定 Serilog
+            _logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.Console()
+                .WriteTo.File(
+                    Path.Combine(logDir, "wox-timer-plugin-.log"),
+                    rollingInterval: RollingInterval.Day,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+
+            _logger.Information("Wox 計時器插件已初始化");
         }
 
         public List<Result> Query(Query query)
         {
+            // 記錄查詢操作
+            _logger.Debug("收到查詢 - 關鍵字: {SearchTerm}", query.Search);
+
             var results = new List<Result>();
             if (string.IsNullOrEmpty(query.Search))
             {
@@ -55,7 +82,7 @@ namespace WoxTimerPlugin
                     SubTitle = "倒數計時: timer HH:mm:ss [標題] | 鬧鐘: timer HH:mm [標題]",
                     IcoPath = "Images\\timer.png"
                 });
-                
+
                 // 查看所有計時器選項
                 if (_activeTimers.Count > 0)
                 {
@@ -70,7 +97,7 @@ namespace WoxTimerPlugin
                             return false;
                         }
                     });
-                    
+
                     results.Add(new Result
                     {
                         Title = "取消所有計時器與鬧鐘",
@@ -83,7 +110,7 @@ namespace WoxTimerPlugin
                         }
                     });
                 }
-                
+
                 return results;
             }
 
@@ -97,7 +124,7 @@ namespace WoxTimerPlugin
                         var timerId = pair.Key;
                         var timerInfo = pair.Value;
                         string itemType = timerInfo.IsAlarm ? "鬧鐘" : "計時器";
-                        
+
                         results.Add(new Result
                         {
                             Title = $"{itemType}: {timerInfo.Title} - 剩餘 {timerInfo.GetRemainingTime()}",
@@ -120,10 +147,10 @@ namespace WoxTimerPlugin
                         IcoPath = "Images\\timer.png"
                     });
                 }
-                
+
                 return results;
             }
-            
+
             // 檢查是否為取消命令
             if (query.Search.Trim().ToLower() == "cancel" || query.Search.Trim().ToLower() == "取消")
             {
@@ -140,7 +167,7 @@ namespace WoxTimerPlugin
                             return true;
                         }
                     });
-                    
+
                     // 提供查看列表的選項
                     results.Add(new Result
                     {
@@ -163,7 +190,7 @@ namespace WoxTimerPlugin
                         IcoPath = "Images\\timer.png"
                     });
                 }
-                
+
                 return results;
             }
 
@@ -219,36 +246,36 @@ namespace WoxTimerPlugin
                         IcoPath = "Images\\timer.png"
                     });
                 }
-                
+
                 return results;
             }
-            
+
             // 如果不是倒數計時格式，嘗試匹配鬧鐘格式 (HH:mm)
             var alarmMatch = AlarmTimeRegex.Match(timeStr);
             if (alarmMatch.Success)
             {
                 int hours = int.Parse(alarmMatch.Groups["hours"].Value);
                 int minutes = int.Parse(alarmMatch.Groups["minutes"].Value);
-                
+
                 // 確保時間格式合理
                 if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60)
                 {
                     // 計算鬧鐘時間
                     DateTime now = DateTime.Now;
                     DateTime alarmTime = new DateTime(now.Year, now.Month, now.Day, hours, minutes, 0);
-                    
+
                     // 如果鬧鐘時間已經過去，設定為明天同一時間
                     if (alarmTime <= now)
                     {
                         alarmTime = alarmTime.AddDays(1);
                     }
-                    
+
                     // 計算秒數差異
                     TimeSpan timeSpan = alarmTime - now;
                     int totalSeconds = (int)timeSpan.TotalSeconds;
                     string displayTime = $"{alarmTime:HH:mm}";
                     string remainingTime = FormatTimeDisplay((int)timeSpan.TotalHours, timeSpan.Minutes, timeSpan.Seconds);
-                    
+
                     results.Add(new Result
                     {
                         Title = $"設定鬧鐘 {displayTime} ({remainingTime}後)",
@@ -270,10 +297,10 @@ namespace WoxTimerPlugin
                         IcoPath = "Images\\timer.png"
                     });
                 }
-                
+
                 return results;
             }
-            
+
             // 如果都不匹配，顯示格式提示
             results.Add(new Result
             {
@@ -300,37 +327,51 @@ namespace WoxTimerPlugin
                 return $"{seconds}秒";
             }
         }
-
         private void StartTimer(int seconds, string title, bool isAlarm, DateTime? specificEndTime = null)
         {
             // 建立唯一ID
             string id = Guid.NewGuid().ToString();
-            
+
             // 轉換為毫秒
             int milliseconds = seconds * 1000;
-            
+
             // 計算結束時間
             DateTime endTime = specificEndTime ?? DateTime.Now.AddSeconds(seconds);
-            
+
             // 顯示通知：計時器/鬧鐘已啟動
             string notificationType = isAlarm ? "鬧鐘" : "計時器";
-            string notification = isAlarm 
-                ? $"{endTime:HH:mm} - {title}" 
-                : $"{FormatTimeDisplay(seconds/3600, (seconds/60)%60, seconds%60)} - {title}";
-                
+            string notification = isAlarm
+                ? $"{endTime:HH:mm} - {title}"
+                : $"{FormatTimeDisplay(seconds / 3600, (seconds / 60) % 60, seconds % 60)} - {title}";
+
+            // 記錄啟動資訊
+            _logger.Information(
+                "{TimerType} 已啟動 - ID: {ID}, 標題: {Title}, 持續時間: {Duration}秒, 結束時間: {EndTime}",
+                notificationType,
+                id,
+                title,
+                seconds,
+                endTime);
+
             ShowNotification($"{notificationType}已啟動", notification);
-            
+
             // 建立 Timer 實例
             var timer = new System.Threading.Timer(state =>
             {
                 // 通知使用者時間到
                 string completeMessage = isAlarm ? "鬧鐘時間到！" : "倒數計時完成！";
                 ShowNotification(title, completeMessage);
-                
+
+                // 記錄完成資訊
+                _logger.Information(
+                    "{TimerType} 已完成 - ID: {ID}, 標題: {Title}",
+                    isAlarm ? "鬧鐘" : "計時器",
+                    id,
+                    title);
+
                 // 從活動計時器中移除
                 _activeTimers.Remove(id);
             }, null, milliseconds, Timeout.Infinite);
-            
             // 將計時器資訊儲存到字典
             _activeTimers[id] = new TimerInfo
             {
@@ -341,12 +382,11 @@ namespace WoxTimerPlugin
                 IsAlarm = isAlarm
             };
         }
-
         private void CancelAllTimers()
         {
             int timerCount = 0;
             int alarmCount = 0;
-            
+
             foreach (var timerInfo in _activeTimers.Values)
             {
                 timerInfo.Timer.Dispose();
@@ -355,10 +395,15 @@ namespace WoxTimerPlugin
                 else
                     timerCount++;
             }
-            
+
             int totalCount = _activeTimers.Count;
+
+            // 記錄取消資訊
+            _logger.Information("批次取消所有計時器及鬧鐘 - 數量: {TotalCount}（計時器: {TimerCount}，鬧鐘: {AlarmCount}）",
+                totalCount, timerCount, alarmCount);
+
             _activeTimers.Clear();
-            
+
             if (timerCount > 0 && alarmCount > 0)
                 ShowNotification("已取消", $"已取消 {timerCount} 個計時器和 {alarmCount} 個鬧鐘");
             else if (timerCount > 0)
@@ -366,21 +411,31 @@ namespace WoxTimerPlugin
             else
                 ShowNotification("鬧鐘已取消", $"已取消 {alarmCount} 個鬧鐘");
         }
-
         private void CancelTimer(string timerId)
         {
             if (_activeTimers.TryGetValue(timerId, out var timerInfo))
             {
                 timerInfo.Timer.Dispose();
                 _activeTimers.Remove(timerId);
-                
+
                 string itemType = timerInfo.IsAlarm ? "鬧鐘" : "計時器";
+
+                // 記錄取消資訊
+                _logger.Information(
+                    "{TimerType} 已手動取消 - ID: {ID}, 標題: {Title}, 原定結束時間: {EndTime}",
+                    itemType,
+                    timerId,
+                    timerInfo.Title,
+                    timerInfo.EndTime);
+
                 ShowNotification($"{itemType}已取消", $"已取消{itemType}: {timerInfo.Title}");
             }
         }
-
         private void ShowNotification(string title, string message)
         {
+            // 記錄通知訊息
+            _logger.Debug("顯示系統通知 - 標題: {Title}, 訊息: {Message}", title, message);
+
             // 顯示 Windows 通知
             var notification = new NotifyIcon
             {
@@ -389,9 +444,10 @@ namespace WoxTimerPlugin
                 BalloonTipTitle = title,
                 BalloonTipText = message
             };
-            
+
             notification.ShowBalloonTip(5000); // 顯示 5 秒
-              // 設定自動清理通知
+
+            // 設定自動清理通知
             var disposeTimer = new System.Threading.Timer(obj =>
             {
                 notification.Dispose();
