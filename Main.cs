@@ -68,9 +68,6 @@ namespace WoxTimerPlugin
 
         public List<Result> Query(Query query)
         {
-            // 記錄查詢操作
-            _logger.Debug("收到查詢 - 關鍵字: {SearchTerm}", query.Search);
-
             var results = new List<Result>();
             if (string.IsNullOrEmpty(query.Search))
             {
@@ -92,6 +89,11 @@ namespace WoxTimerPlugin
                         IcoPath = "Images\\timer.png",
                         Action = c =>
                         {
+                            // 原始程式碼:
+                            // _context.API.ChangeQuery("timer 列表");
+                            // return false;
+                            Thread.Sleep(300);
+                            _logger.Debug("收到查詢 - 關鍵字: {SearchTerm}", query.Search);
                             _context.API.ChangeQuery("timer 列表");
                             return false;
                         }
@@ -430,27 +432,37 @@ namespace WoxTimerPlugin
                 ShowNotification($"{itemType}已取消", $"已取消{itemType}: {timerInfo.Title}");
             }
         }
+        
         private void ShowNotification(string title, string message)
         {
-            // 記錄通知訊息
-            _logger.Debug("顯示系統通知 - 標題: {Title}, 訊息: {Message}", title, message);
-
-            // 顯示 Windows 通知
-            var notification = new NotifyIcon
+            using (var notifyIcon = new System.Windows.Forms.NotifyIcon())
             {
-                Visible = true,
-                Icon = System.Drawing.SystemIcons.Information,
-                BalloonTipTitle = title,
-                BalloonTipText = message
-            };
+                string exeDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string iconPath = System.IO.Path.Combine(exeDir, "Images", "timer.png");
+            
+                // 修改後的代碼，僅使用 .ico 檔案作為自訂圖示
+                if (System.IO.File.Exists(iconPath) && System.IO.Path.GetExtension(iconPath).ToLower() == ".ico")
+                {
+                    notifyIcon.Icon = new System.Drawing.Icon(iconPath);
+                }
+                else
+                {
+                    notifyIcon.Icon = System.Drawing.SystemIcons.Information;
+                }
+                notifyIcon.Visible = true;
+                notifyIcon.ShowBalloonTip(5000, title, message, System.Windows.Forms.ToolTipIcon.Info);
+                System.Threading.Thread.Sleep(5000);
+                notifyIcon.Visible = false;
+            }
+        }
 
-            notification.ShowBalloonTip(5000); // 顯示 5 秒
-
-            // 設定自動清理通知
-            var disposeTimer = new System.Threading.Timer(obj =>
-            {
-                notification.Dispose();
-            }, null, 6000, Timeout.Infinite);
+        // 處理計時器完成時的操作，包括釋放計時器、更新記錄以及顯示桌面通知
+        private void HandleTimerFinish(string timerId, TimerInfo info)
+        {
+            info.Timer.Dispose();
+            _activeTimers.Remove(timerId);
+            ShowNotification("計時完成", $"{info.Title} 已完成倒數計時。");
+            _logger.Information("{Title} 的計時器已完成", info.Title);
         }
     }
 }
