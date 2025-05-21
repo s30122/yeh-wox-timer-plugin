@@ -52,15 +52,14 @@ namespace WoxTimerPlugin
             if (!Directory.Exists(logDir))
             {
                 Directory.CreateDirectory(logDir);
-            }
-
-            // 設定 Serilog
+            }            // 設定 Serilog
             _logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .WriteTo.Console()
                 .WriteTo.File(
                     Path.Combine(logDir, "wox-timer-plugin-.log"),
                     rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 5, // 保留最近5天的日誌
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
 
