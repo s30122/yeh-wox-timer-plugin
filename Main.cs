@@ -47,12 +47,16 @@ namespace WoxTimerPlugin
         {
             _context = context;
 
-            // 建立日誌目錄
-            string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WoxTimerPlugin", "Logs");
+            // 取得執行檔所在目錄
+            string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string logDir = Path.Combine(exeDir, "Logs");
+            
             if (!Directory.Exists(logDir))
             {
                 Directory.CreateDirectory(logDir);
-            }            // 設定 Serilog
+            }
+            
+            // 設定 Serilog
             _logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .WriteTo.Console()
@@ -144,7 +148,7 @@ namespace WoxTimerPlugin
                     results.Add(new Result
                     {
                         Title = "目前沒有活動的計時器或鬧鐘",
-                        SubTitle = "計時器: timer HH:mm:ss [標題] | 鬧鐘: timer HH:mm [標題]",
+                        SubTitle = "計時器: timer HH:mm:ss | 鬧鐘: timer HH:mm [標題]",
                         IcoPath = "Images\\timer.png"
                     });
                 }
